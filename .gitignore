@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+.idea/
+.runtime-webhook.json
+.venv/
+.venv-*/
+venv/
+runs/
+models/
+local-models/
+*.safetensors
+*.pth
+*.ckpt
+*.task
