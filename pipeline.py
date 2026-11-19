@@ -5,6 +5,7 @@ import av, numpy as np
 from PIL import Image
 
 from config import load_env
+from task_control import checkpoint
 load_env()
 
 SAM='linoyts/SAM3-Video'
@@ -34,6 +35,7 @@ def normalize(src,dst):
         scale=min(1,960/max(cur.width,cur.height));w=max(2,int(cur.width*scale)//2*2);h=max(2,int(cur.height*scale)//2*2)
         out,stream=writer(dst,w,h);count=round(dur*24)
         for i in range(count):
+            checkpoint()
             t=i/24+start
             while nxt is not None and float(nxt.time)<=t:cur=nxt;nxt=next(it,None)
             a=np.asarray(cur.to_image().resize((w,h),Image.Resampling.LANCZOS));put(out,stream,a,i)
@@ -69,6 +71,7 @@ def composite(original,depth,seg,directory,audio_source=None):
             raise ValueError(f'SAM 3 text tracking is unsuitable for this clip: masks exist in only {valid}/{counts[0]} frames. Changing the text prompt or re-uploading the same clip is unlikely to help. This build has no box/point or frame-editing tool. Use a clip where the subject stays clearly visible, or add a tracking segmentation backend seeded by an initial mask.')
     outs={};area=0
     for i,(rgb,d,sam) in enumerate(zip(frames(original),frames(depth),(np.asarray(Image.open(p).convert('RGB')) for p in mask_files) if raw else frames(seg))):
+        checkpoint()
         h,w=rgb.shape[:2]
         if raw:
             mask=(sam[:,:,0]>127).astype(np.uint8)*255

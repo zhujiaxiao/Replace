@@ -11,7 +11,7 @@ if ! command -v rubberband >/dev/null 2>&1; then
   echo "See docs/SETUP-AGENT.md for agent-led installation."; exit 1
 fi
 if [ ! -d .venv ]; then "$PYTHON" -m venv .venv; fi
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirement.txt
 if [ ! -f .env ]; then cp .env.example .env; chmod 600 .env; fi
 .venv/bin/python doctor.py
 printf '\nNext: fill .env with your own keys, run bash start.command, then .venv/bin/python doctor.py --require-keys in another terminal\n'

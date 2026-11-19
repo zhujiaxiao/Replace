@@ -4,6 +4,22 @@ from unittest.mock import patch,Mock
 import mask_review,seedance_bridge
 
 class WorkflowTests(unittest.TestCase):
+ def test_scnet_video_duration_stays_in_supported_range(self):
+  source=Mock();source.duration=3.46*seedance_bridge.av.time_base
+  source.streams.video=[Mock(width=1920,height=1080)]
+  context=Mock();context.__enter__=Mock(return_value=source);context.__exit__=Mock(return_value=False)
+  with patch('seedance_bridge.av.open',return_value=context):
+   self.assertEqual(seedance_bridge._video_parameters('short.mp4')['duration'],4)
+  source.duration=28*seedance_bridge.av.time_base
+  with patch('seedance_bridge.av.open',return_value=context):
+   self.assertEqual(seedance_bridge._video_parameters('long.mp4')['duration'],15)
+ def test_minimax_parameters_can_use_native_resolution(self):
+  source=Mock();source.duration=5*seedance_bridge.av.time_base
+  source.streams.video=[Mock(width=1920,height=1080)]
+  context=Mock();context.__enter__=Mock(return_value=source);context.__exit__=Mock(return_value=False)
+  with patch('seedance_bridge.av.open',return_value=context):
+   parameters=seedance_bridge._video_parameters('clip.mp4',None)
+  self.assertNotIn('resolution',parameters)
  def test_mask_changed_invalidates_approval(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d)
@@ -48,6 +64,7 @@ class WorkflowTests(unittest.TestCase):
     seedance_bridge.submit(p,expanded,'reference.png',model='Seedance2.0')
    payload=post.call_args.kwargs['json'];self.assertEqual(payload['input']['prompt'].count('The reference video is the prepared source'),1)
    self.assertIn('must never be visible',payload['input']['prompt'])
+   self.assertIn('Do not copy its pose',payload['input']['prompt'])
    self.assertEqual(json.loads((p/'generation.json').read_text())['user_prompt'],'User prompt')
  def test_edit_draft_self_contained(self):
   with tempfile.TemporaryDirectory() as d:
@@ -58,6 +75,14 @@ class WorkflowTests(unittest.TestCase):
     payload=post.call_args.kwargs['json']
     self.assertEqual(payload['model'],'SeeDance-2-5-LumaCraft');self.assertEqual(payload['parameters']['resolution'],'720p');self.assertEqual(payload['input']['media'][0]['type'],'reference_image');self.assertEqual(payload['input']['media'][1]['type'],'reference_video')
     self.assertTrue((p/'generation.json').exists())
+ def test_minimax_draft_uses_scnet_768p_enum(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d);(p/'audio-manifest.json').write_text('{}')
+   response=Mock();response.ok=True;response.json.return_value={'output':{'task_id':'fake-id','task_status':'pending'}}
+   with patch('mask_review.require_approved'),patch('seedance_bridge.credential',return_value='test'),patch('seedance_bridge.setting',return_value='https://example.org'),patch('seedance_bridge.upload',return_value='https://example.org/media'),patch('audio_workflow.prepare_seedance_video',return_value=p/'seedance-input.mp4'),patch('seedance_bridge._video_parameters',return_value={'duration':5,'resolution':'768P'}) as parameters,patch('seedance_bridge.requests.post',return_value=response) as post:
+    seedance_bridge.submit(p,'Replace one subject','reference.png',model='Minimax-H3-LumaCraft')
+   parameters.assert_called_once_with(p/'seedance-input.mp4','768P')
+   self.assertEqual(post.call_args.kwargs['json']['parameters']['resolution'],'768P')
  def test_collection_downloads_and_restores(self):
   with tempfile.TemporaryDirectory() as d:
    response=Mock();response.json.return_value={'output':{'task_status':'succeeded','results':['https://example.org/result.mp4']}}
@@ -75,5 +100,14 @@ class WorkflowTests(unittest.TestCase):
     self.assertEqual(seedance_bridge.submit_hd(p),'hd-id')
     self.assertEqual(post.call_args.kwargs['json']['parameters']['resolution'],'1080p')
     with self.assertRaises(ValueError):seedance_bridge.submit_hd(p)
+ def test_minimax_hd_export_uses_2k_enum(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)
+   for name in ['upload.mp4','final-preview.mp4']:(p/name).write_bytes(b'test')
+   (p/'seedance-request.json').write_text(json.dumps({'model':'Minimax-H3-LumaCraft','input':{'prompt':'x'},'parameters':{}}))
+   response=Mock();response.ok=True;response.json.return_value={'output':{'task_id':'hd-id','task_status':'pending'}}
+   with patch('seedance_bridge.credential',return_value='test'),patch('seedance_bridge.requests.post',return_value=response) as post:
+    self.assertEqual(seedance_bridge.submit_hd(p),'hd-id')
+   self.assertEqual(post.call_args.kwargs['json']['parameters']['resolution'],'2K')
 
 if __name__=='__main__':unittest.main()

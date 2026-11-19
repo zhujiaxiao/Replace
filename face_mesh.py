@@ -1,6 +1,7 @@
 """Optional local face-mesh preparation; no depth or segmentation calls."""
 from pathlib import Path
 import json,subprocess,sys,shutil
+from task_control import run as controlled_run
 ROOT=Path(__file__).resolve().parent
 
 def run(src,folder,status=print):
@@ -12,7 +13,7 @@ def run(src,folder,status=print):
     folder.mkdir(parents=True,exist_ok=True)
     status('Normalizing video');normalize(src,folder/'original.mp4')
     status('Tracking face mesh locally · no depth or SAM')
-    try:subprocess.run([str(python),str(ROOT/'mesh_worker.py'),str(folder)],check=True)
+    try:controlled_run([str(python),str(ROOT/'mesh_worker.py'),str(folder)])
     except subprocess.CalledProcessError as exc:
         report=folder/'face-tracking.json';data=json.loads(report.read_text()) if report.exists() else {}
         tracked=data.get('tracked',0);frames=data.get('frames',0)
@@ -33,7 +34,7 @@ def run_depth(src,folder,prompt='person',provider='local',status=print):
     run_advanced(src,folder,prompt,provider,status)
     shutil.copy2(folder/'composite-silent.mp4',folder/'depth-composite-silent.mp4')
     status('Adding face mesh from original video onto depth composite')
-    try:subprocess.run([str(python),str(ROOT/'mesh_worker.py'),str(folder),'--depth'],check=True)
+    try:controlled_run([str(python),str(ROOT/'mesh_worker.py'),str(folder),'--depth'])
     except subprocess.CalledProcessError as exc:
         report=folder/'face-tracking.json';data=json.loads(report.read_text()) if report.exists() else {}
         raise ValueError(f'高级 + Face Mesh 跟踪失败：只在 {data.get("tracked",0)}/{data.get("frames",0)} 帧检测到脸部。请使用脸部持续清晰可见的视频，或改用不含 Face Mesh 的高级深度模式。') from exc

@@ -4,6 +4,9 @@ __pycache__/
 .DS_Store
 .idea/
 .runtime-webhook.json
+app.db
+app.db-shm
+app.db-wal
 .venv/
 .venv-*/
 venv/
@@ -14,3 +17,26 @@ local-models/
 *.pth
 *.ckpt
 *.task
+
+# 私有配置、运行数据与本地缓存
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*
+*.log
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+.vscode/
+*.tmp
+*.bak
+*.swp
+*.swo
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/

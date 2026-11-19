@@ -1,159 +1,134 @@
-<p align="center">
-  <a href="examples/advanced-black-nodes-v8-audio.mp4"><img src="examples/previews/workflow.gif" width="28%" alt="Workflow animation — click for full video with audio" /></a>
-  <a href="examples/1006%20%281%29.mp4"><img src="examples/previews/example-1.gif" width="34%" alt="Example 1 — click for full video with audio" /></a>
-  <a href="examples/1006%20%281%29%283%29.mp4"><img src="examples/previews/example-2.gif" width="34%" alt="Example 2 — click for full video with audio" /></a>
-</p>
-<p align="center"><em>Click any preview to open its full video with audio.</em></p>
+# 复刻镜 AI · 视频角色替换
 
-<h1 align="center">复刻镜 — Open Source Workflow</h1>
-<p align="center">Your scene. New characters.</p>
-<p align="center">
-  <a href="docs/SETUP-AGENT.md">Agent setup</a> ·
-  <a href="examples/README.md">Examples</a> ·
-  <a href="LICENSE">MIT license</a>
-</p>
+复刻镜 AI 是支持桌面和手机浏览器的视频角色替换工作台，整合本地输入准备、全片审核、角色参考、SCNet 云端草稿生成及高清导出。
 
-A local UI and agent-assisted workflow for replacing video subjects using colored depth, SAM 3 masks and Seedance through Enhancor. Draft first; approve before 1080p. The final export restores the **entire original source audio**, not generated audio.
+## 主要功能
 
-## Easiest setup: let your coding agent install it
+- 深度 + SAM、面部网格、深度 + 面部网格三种准备方式。
+- 本地运行 Video Depth Anything、SAM 3、Demucs 和 MediaPipe。
+- 分离人声并升调三个半音，保持时间；结果恢复完整原始音轨。
+- 原片、合成输入、深度、Mask、草稿预览与对比，问题帧标记。
+- 任务队列、终止、历史删除及显式批准的独立高清生成。
+- 注册登录、自动游客模式、任务和媒体访问隔离、管理员查看全部任务。
 
-Extract the ZIP, open **this folder** in Codex or another coding agent with terminal/file access, and paste:
+本地准备无需 Replicate API；视频生成依赖 SCNet API，提交草稿和高清任务可能计费。
 
-> Set up the 复刻镜 internal video workflow project for me. Read `docs/SETUP-AGENT.md` and follow it end to end. Detect my OS, install missing Python/Rubber Band/cloudflared prerequisites using the supported package manager, create the virtual environments, install dependencies, create `.env` without overwriting it, run local tests, launch the app and verify the UI. Do not submit paid generations.
+## 技术栈与依赖
 
-The launcher starts a callback-only Quick Tunnel when no custom webhook is configured. Keep it running with the app. The agent uses the included [setup runbook](docs/SETUP-AGENT.md). You only need to supply your own provider keys and approve any required system installation. No separate agent install is required. Native Windows users should use WSL2; macOS/Linux launch scripts are included.
+前端：HTML、CSS、原生 JavaScript ES Modules、HTML5 Video、SVG。
+后端：Python、FastAPI、Uvicorn、SQLite。
+处理：PyTorch、Transformers、PyAV、FFmpeg、Rubber Band、NumPy、Pillow、OpenCV、SciPy。
 
-## Manual setup
+推荐 Python 3.12，系统还需 Git、FFmpeg/FFprobe、Rubber Band CLI。cloudflared 用于当前启动器的兼容回调隧道。
 
-1. Install Python 3.12+ (the development runtime was Python 3.14) and Rubber Band CLI:
-   - macOS: `brew install rubberband cloudflared`
-   - Ubuntu/Debian or WSL: `sudo apt install rubberband-cli python3-venv`
-   - Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) too, unless you already have a public HTTPS webhook receiver. On launch it creates a temporary callback-only tunnel; the UI and media stay on localhost.
-2. In this folder, run `bash setup.sh`. This creates an isolated `.venv`, installs `requirements.txt`, creates a blank `.env`, and checks dependencies. To enable all three modes, install Python 3.12 and run `bash setup-face-mesh.sh`, then `.venv/bin/python doctor.py --mesh`. On macOS, install the worker interpreter with `brew install python@3.12` if needed.
-3. Fill `.env` with **your own** `ENHANCOR_API_KEY` and `REPLICATE_API_TOKEN`. Get them from [Enhancor](https://app.enhancor.ai/api-dashboard) and [Replicate](https://replicate.com/account/api-tokens). Fund/enable the relevant API accounts. `HF_TOKEN` is optional for the Hugging Face depth alternative.
-4. Run `./start.command` (or `bash start.command`). Open **http://127.0.0.1:8770**. Use `PORT=8771 bash start.command` if the port is occupied.
-   - Once running, check `.venv/bin/python doctor.py --require-keys`. Enhancor requires a webhook URL: `launch.py` supplies one through cloudflared, or you can set `ENHANCOR_WEBHOOK_URL` yourself. Keep the app/tunnel running.
-5. Upload your own MP4/MOV, prepare it, inspect the entire mask and prepared video, approve that exact mask, provide your own character references, review the prompt, and create a draft.
-6. When you like the draft, click the 1080p approval button. The completed draft and HD result remain separate; both final previews use source audio.
+全部 Python 依赖统一维护在 `requirement.txt`，主应用和两个独立工作环境均从此文件安装。模型权重和系统命令仍需单独安装。
 
-No local model weights or GPU are needed for the default hosted setup. Python packages and the Rubber Band executable are required locally. No API keys, signed media URLs, or old jobs are included. Four user-selected demonstration videos are included in `examples/`. The bundled TEIN companion artwork is part of the UI.
+默认模型为 `Minimax-H3-LumaCraft`，其次是 `Minimax-H3-Max-LumaCraft`，再列出 Seedance 系列。历史任务仍沿用其保存的模型。
 
-## What happens
+## 安装与启动
 
-1. Save the source unchanged; extract audio and separate vocals/music with Demucs on Replicate.
-2. Pitch isolated vocals **+3 semitones**, maintaining duration with Rubber Band.
-3. Normalize the working video to 24 fps, up to 960 pixels; obtain colored depth with `lucataco/depth-anything-video`. Preserve returned colors.
-4. Use SAM 3 raw PNG masks on depth. Check alignment, coverage and background spill. An agent can retry segmentation on the original RGB if depth loses detail.
-5. Composite the depth subject over the original background. Mandatory full-clip visual mask review gates every generation. Approval is bound to hashes of the current artifacts.
-6. Embed the pitched vocals into the composite MP4. Send this video, **no standalone audio**, with character references.
-7. Enhancor Seedance **Edit** for image references; **Omni / multi_reference** for a video identity reference. Generate a draft by default.
-8. Poll for completion, download the result, discard its audio and copy the complete original soundtrack into the final MP4.
-9. After explicit HD approval, complete the accepted draft at 1080p and restore the soundtrack again.
+### 1. 获取仓库并安装系统依赖
 
-## Autonomous agent operation
-
-Open this folder in your coding agent and ask it to follow `AGENTS.md` and `.agents/skills/tein-video-workflow/SKILL.md`. No particular agent vendor or model is required, but it must be able to inspect video and files, run Python, and access the network. An agent service is **not** bundled or silently started. The UI/server automates processing and result collection; the agent or user performs visual QA and creative review.
-
-Example: “Use the Genjustsu workflow for my clip and references. Prepare and inspect the entire mask, repair it if needed, show the prompt, submit the authorized draft, and retrieve the final preview. Wait for my approval before HD.”
-
-See [agent operations](docs/AGENT-OPERATIONS.md), [API integration](docs/ENHANCOR-API.md), [models](docs/MODELS.md), [media hosting](docs/MEDIA-HOSTING.md), and [troubleshooting](docs/TROUBLESHOOTING.md).
-
-## Recovery and checks
+克隆自己的 GitLab 仓库并进入目录。macOS 可执行：
 
 ```bash
-.venv/bin/python doctor.py --require-keys
-.venv/bin/python test_composite.py
-.venv/bin/python -m unittest discover -s tests
-.venv/bin/python workflow.py status LOCAL_JOB_ID
-.venv/bin/python workflow.py resume LOCAL_JOB_ID
-.venv/bin/python workflow.py resume LOCAL_JOB_ID --hd
+brew install python@3.12 ffmpeg rubberband cloudflared git-lfs
 ```
 
-The server resumes saved Seedance/HD **collection** on restart. It does not re-submit those requests. Preparation interrupted during a remote model call requires agent inspection of saved prediction metadata; do not blindly restart billed stages. Keep one server/collector per job. This is a local single-user application, not a multi-user hosted service. Bind to localhost; add authentication and a durable worker queue before public hosting.
+Ubuntu/Debian 请安装 Python 3.12、venv、FFmpeg、Rubber Band，并按对应系统安装 cloudflared。
 
-## Tested release
+### 2. 主应用环境
 
-Clean installation tested on macOS ARM64 with Python 3.14.6. Thirteen automated tests passed, plus a live draft → approved 1080p run and actual browser download. The test caught and fixed the Tmpfiles URL and required-webhook setup issues. Final source audio was verified byte-for-byte. See [validation and remaining limits](docs/VALIDATION.md). Other OS installations and the optional Catbox route have not been live-tested.
+```bash
+PYTHON=python3.12 bash setup.sh
+```
 
-## Sharing
+也可以手动安装：
 
-Share the original clean ZIP, or remove `.env`, `.venv`, `runs`, logs and caches before repackaging. Runs contain private media and provider URLs. Dependencies and hosted models retain their own licenses and service terms. See `THIRD-PARTY.md`.
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirement.txt
+cp .env.example .env
+```
 
-## Watch the workflow and examples
+### 3. 本地模型环境
 
-Animated previews below are silent. Click a preview or its video link to open the full MP4 with audio.
+```bash
+PYTHON=python3.12 bash setup-local-models.sh
+FACE_PYTHON=python3.12 bash setup-face-mesh.sh
+```
 
-### Workflow walkthrough
+脚本下载 Video Depth Anything 仓库和小型权重。SAM 3 需自行获取有权访问的完整模型目录，放置为：
 
-[![Animated workflow walkthrough](examples/previews/workflow.gif)](examples/advanced-black-nodes-v8-audio.mp4)
+```text
+local-models/sam3/model.safetensors
+local-models/sam3/...模型配置与处理器文件
+local-models/Video-Depth-Anything/checkpoints/video_depth_anything_vits.pth
+```
 
-[Watch the full workflow video with audio](examples/advanced-black-nodes-v8-audio.mp4)
+SAM 3 必须包含完整权重和配置，不能仅有 Git LFS 指针。Demucs 和 Face Landmarker 首次使用可能下载模型。预留足够内存、推理资源和磁盘空间。
 
-### Example 1
+### 4. 配置服务
 
-[![Animated preview of example 1](examples/previews/example-1.gif)](examples/1006%20%281%29.mp4)
+编辑项目的 .env：
 
-[Watch the full example 1 video](examples/1006%20%281%29.mp4)
+```dotenv
+SCNET_API_KEY=填写自己的密钥
+SCNET_BASE_URL=https://api.scnet.cn/api/llm/v1
+SCNET_VIDEO_MODEL=Minimax-H3-LumaCraft
+MEDIA_HOST=scnet
+MEDIA_HOST_FALLBACKS=
+```
 
-### Example 2
+模型以账号实际权限和界面列表为准。Seedance 使用 720p 草稿、1080p 高清；Minimax H3 使用 768P 草稿、2K 高清。
 
-[![Animated preview of example 2](examples/previews/example-2.gif)](examples/1006%20%281%29%283%29.mp4)
+### 5. 检查与运行
 
-[Watch the full example 2 video](examples/1006%20%281%29%283%29.mp4)
+```bash
+.venv/bin/python doctor.py
+bash start.command
+```
 
-Previews show up to the first six seconds. See [all example files](examples/README.md). Examples are optional and not needed for setup.
+也可运行：
 
-## Before publishing on GitHub
+```bash
+.venv/bin/python launch.py
+```
 
-Use this clean project folder, not a working installation containing jobs or credentials. `.gitignore` excludes secrets, environments, generated jobs and logs; it cannot remove files already committed to Git history. Keep `.env.example` blank for secrets. Do not commit `.env`, runtime webhook URLs, provider responses or run folders. No repository history is included in this ZIP.
+浏览器打开 http://127.0.0.1:8770/ 。更换端口：
 
-The code and documentation are licensed under MIT; example videos and TEIN artwork are excluded and require separate redistribution rights. This app is designed for localhost use, not unauthenticated public deployment.
+```bash
+PORT=8771 bash start.command
+```
 
-## License
+网页启动成功不代表本地模型和生成权限已就绪。安装阶段不要提交付费任务验证环境。
 
-Code and documentation: [MIT](LICENSE), copyright © 2026 Sirio Berati.
+## 使用步骤
 
-TEIN names, logos, companion artwork, and all example media are excluded from the MIT grant. No permission to reuse those assets is granted here; their respective owners retain their rights. Third-party dependencies and services retain their own licenses and terms. See [third-party notices](THIRD-PARTY.md).
+1. 打开网页，默认进入游客模式；右上角可登录或注册。
+2. 选择原始视频，选择准备方式；深度模式填写替换主体描述。
+3. 点击“开始映射”，等待本地准备。手机选择视频后进入素材准备区。
+4. 完整检查合成输入、Mask/面部跟踪和音频，确认后批准输入。问题帧标记仅用于定位。
+5. 上传角色参考，编辑复刻描述，选择模型。
+6. 创建草稿并核对完整提示词，确认后提交；手机自动切换镜面预览查看进度。
+7. 完成后验收和下载，结果自动恢复原始音轨。
+8. 如需高清，另行批准独立生成任务。
 
+面部网格适合单个居中、持续露脸的人物。转身、遮挡和小脸可能导致跟踪失败；重做输入后需重新审核。
 
-## Fast alternative: face mesh
+任务队列显示运行、排队和历史任务。终止会停止本地处理或轮询，服务商任务仍可能继续计费。删除会清理对应本机文件。
 
-Choose **Fast · Face mesh** in the UI, or use `workflow.py prepare VIDEO --mode face_mesh`. Install the optional worker once with `bash setup-face-mesh.sh` (Python 3.12 required; isolated `.venv-face`). The model downloads from Google's official storage on first use.
+## 目录说明
 
-This path keeps the original video, tracks and saves facial landmarks, draws the mesh, isolates vocals and embeds the +3 pitched vocals. It makes **no depth or SAM calls**. It is currently designed for a single centered speaker; inspect all frames and stop on tracking gaps or incorrect face alignment. Do not claim mask review in this mode: review facial tracking and audio instead. Saved artifact hashes gate submission.
+- app.py、auth.py：Web API、用户和权限。
+- pipeline.py、local_models.py、local_sam3.py：深度和主体分割。
+- face_mesh.py、mesh_worker.py：面部网格。
+- audio_workflow.py：人声处理及原始音轨恢复。
+- seedance_bridge.py：SCNet 请求与结果收集。
+- task_control.py：任务取消。
+- static/：前端；tests/：测试；docs/：技术说明，部分为历史上游文档。
+- local-models/、models/：模型；runs/、app.db：私有运行数据，均忽略提交。
 
-Use the same character references, draft-first submission, collection, original-audio restoration and explicitly approved HD upgrade. In the prompt, explain that mesh lines are motion guidance and must disappear, replace the complete original identity including hair, and preserve all dialogue and timing. Image reference uses Edit; video identity uses Omni. Keep advanced depth mode available. Do not submit automatically during setup.
+## 许可
 
-
-### Combined depth + face mesh
-
-Select **Advanced + Face mesh** in the UI or use `workflow.py prepare VIDEO --mode depth_mesh`. This runs the original depth/SAM pipeline, preserves its depth composite, then tracks the face from the original frames and overlays the mesh onto that composite. Landmarks are saved in `face-landmarks.json`. Review BOTH mask coverage and face tracking before approval. All artifacts, including depth, mask, mesh and embedded audio, are bound to review approval. Follow the same draft → approved HD → original-audio restoration flow.
-
-For setup with all three preparation modes, also install Python 3.12 and run `bash setup-face-mesh.sh`. This creates an isolated mesh environment; the main app can retain its existing Python version. A Google Face Landmarker model is downloaded at first use. No SAM/depth inference is used by fast mode. Mesh modes are experimental and currently optimized for one centered speaker.
-
-
-## Tech stack
-
-| Layer | Technology and purpose |
-| --- | --- |
-| Local app | Python 3.12+, FastAPI, Uvicorn; HTML, CSS and vanilla JavaScript UI |
-| Video/audio processing | PyAV, NumPy, Pillow, OpenCV and SciPy; local encoding, compositing and audio restoration |
-| Vocal isolation | Hosted Demucs / htdemucs through Replicate |
-| Pitch | Rubber Band CLI; isolated vocals +3 semitones without changing duration |
-| Colored depth | Replicate `lucataco/depth-anything-video`; optional Hugging Face Video Depth Anything or `chenxwh/depth-any-video` |
-| Segmentation | Replicate `lucataco/sam3-video`; raw per-frame masks and mandatory visual review |
-| Face mesh | Local Google MediaPipe Face Landmarker; saved landmarks and overlay, isolated Python 3.12 worker environment |
-| Generation | Enhancor Seedance; Edit for image references, Omni for video references; draft first, approved 1080p upgrade |
-| Media hosting | Tmpfiles primary; configurable Catbox fallback; direct-link checks before generation |
-| Completion | Persisted job files and polling; callback-only Cloudflare Quick Tunnel for the provider callback requirement |
-| Agent workflow | Included AGENTS.md, setup runbook, skill and CLI; a user-supplied coding agent performs visual QA |
-
-Fast face mesh skips both depth and SAM. Combined mode uses depth + SAM + facial landmarks. All modes embed pitched vocals before generation and restore the original source soundtrack afterward.
-
-## Hosting and failure recovery
-
-The default `.env.example` uses `MEDIA_HOST=tmpfiles` and `MEDIA_HOST_FALLBACKS=catbox`. Each host gets two attempts with a short delay. If temporary hosting fails, the uploader tries Catbox and reports that change. **Both hosts expose media through public URLs; Catbox is persistent.** Set `MEDIA_HOST_FALLBACKS=` to disable fallback, or select Catbox as primary. `CATBOX_USERHASH` is optional.
-
-The uploader checks direct URLs for HTTP errors, empty responses and HTML download pages. These checks cannot guarantee later provider access or codec compatibility. Tmpfiles references expire: for an explicitly authorized regeneration, upload fresh copies instead of reusing old request URLs. A failed upload never triggers a generation call.
-
-Paid generation requests are not automatically retried: on a timeout or unclear response, inspect the saved request/provider status first to avoid duplicate charges. On an explicit media-format failure, validate the local videos and re-upload before retrying. Polling remains the source of truth if callbacks are delayed. See [hosting details](docs/MEDIA-HOSTING.md).
+保留 LICENSE、THIRD-PARTY.md 及上游声明。模型、第三方库和生成服务受各自许可及服务条款约束。

@@ -1,6 +1,6 @@
 # Package validation
 
-Validated on 2026-10-06 in a newly created virtual environment installed from requirements.txt (Python 3.14.6, macOS ARM64):
+Validated on 2026-10-06 in a newly created virtual environment installed from requirement.txt (Python 3.14.6, macOS ARM64):
 
 - Eight isolated tests passed: mask fingerprint invalidation, duplicate-submission protection, self-contained Edit draft payload, result download/restoration dispatch, approved-draft HD payload, rejection of missing mask frames, and byte-identical original audio packet restoration, and dynamic Tmpfiles link extraction.
 - Synthetic four-frame compositing test passed (depth foreground, original background, aligned output).

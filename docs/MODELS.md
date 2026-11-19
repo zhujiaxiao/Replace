@@ -17,4 +17,4 @@ The pinned SAM and Demucs versions and the depth model schema were verified thro
 
 The [SAM3-Video Hugging Face Space](https://huggingface.co/spaces/linoyts/SAM3-Video) was an earlier exploration; it is not the active raw-mask implementation. Never describe a green visualization overlay as a raw mask. Public Spaces may change their Gradio API. An RGB segmentation retry is a deliberate repair, not a different depth color treatment.
 
-`requirements.txt` records versions from the development environment. Setup installs them into a clean venv; the package's local tests are also runnable using a compatible existing environment. Hosted availability, price and access are account-dependent; no free-inference claim is made. Local self-hosting of model weights is not configured here.
+`requirement.txt` records versions from the development environment. Setup installs them into a clean venv; the package's local tests are also runnable using a compatible existing environment. Hosted availability, price and access are account-dependent; no free-inference claim is made. Local self-hosting of model weights is not configured here.

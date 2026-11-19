@@ -24,7 +24,10 @@ def clean_union(mask):
     labels,count=label(mask,structure=np.ones((3,3),bool))
     minimum=max(16,mask.shape[0]*mask.shape[1]//10000)
     cleaned=np.zeros(mask.shape,np.uint8)
-    for ident in range(1,count):
+    # scipy.ndimage.label numbers components from 1 through ``count``.
+    # Include the final component; when a frame contains one clean subject,
+    # range(1, count) is empty and would incorrectly erase the whole mask.
+    for ident in range(1,count+1):
         component=labels==ident
         if int(component.sum())>=minimum:cleaned[component]=255
     return cleaned
